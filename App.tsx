@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Role, TicketStatus, MessageStatus, User, Ticket, AuditLogEntry, Message, Project } from './types';
-import { USERS, INITIAL_TICKETS, PROJECTS } from './constants';
+import { fetchProjects, fetchUsers, fetchTickets } from './db';
 import TicketDetail from './components/TicketDetail';
 import TicketList from './components/TicketList';
 import AdminDashboard from './components/AdminDashboard';
@@ -68,13 +68,14 @@ const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ onCancel, onSubmit 
 };
 
 const App: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(USERS);
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
-  const [tickets, setTickets] = useState<Ticket[]>(INITIAL_TICKETS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  const [currentUser, setCurrentUser] = useState<User>(users[0]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    currentUser.memberships.length > 0 ? currentUser.memberships[0].projectId : null
+    null
   );
 
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
@@ -84,18 +85,41 @@ const App: React.FC = () => {
   const [adminTab, setAdminTab] = useState<'manage' | 'tickets'>('manage');
 
   const currentUserRole = useMemo(() => {
-    if (!selectedProjectId) return undefined;
+    if (!currentUser || !selectedProjectId) return undefined;
     return currentUser.memberships.find(m => m.projectId === selectedProjectId)?.role;
   }, [currentUser, selectedProjectId]);
   
   const availableProjectsForCurrentUser = useMemo(() => {
+    if (!currentUser) return [];
     return projects.filter(p => currentUser.memberships.some(m => m.projectId === p.id));
   }, [currentUser, projects]);
 
   const findUser = (id: string) => users.find(u => u.id === id);
 
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const [p, u, t] = await Promise.all([fetchProjects(), fetchUsers(), fetchTickets()]);
+        setProjects(p);
+        setUsers(u);
+        setTickets(t);
+        if (u.length > 0) {
+          setCurrentUser(u[0]);
+          const firstProjectId = u[0].memberships.length > 0 ? u[0].memberships[0].projectId : null;
+          setSelectedProjectId(firstProjectId);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
   const handleCreateTicket = (title: string, description: string) => {
-    if (!selectedProjectId || !currentUserRole) return;
+    if (!currentUser || !selectedProjectId || !currentUserRole) return;
 
     const newTicket: Ticket = {
       id: Math.floor(Math.random() * 10000),
@@ -169,7 +193,7 @@ const App: React.FC = () => {
     };
     setProjects(prev => [...prev, newProject]);
     
-    const adminUser = users.find(u => u.id === currentUser.id);
+    const adminUser = currentUser ? users.find(u => u.id === currentUser.id) : undefined;
     if(adminUser && adminUser.memberships.some(m => m.role === Role.ADMIN)) {
         const updatedMemberships = [...adminUser.memberships, { projectId: newProject.id, role: Role.ADMIN }];
         handleUpdateUserMemberships(adminUser.id, updatedMemberships);
@@ -369,7 +393,11 @@ const App: React.FC = () => {
       </header>
 
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-        {selectedTicket ? (
+        {isLoading ? (
+          <div className="text-sm text-gray-500">Loading...</div>
+        ) : !currentUser ? (
+          <div className="text-sm text-gray-500">No users found.</div>
+        ) : selectedTicket ? (
           <TicketDetail
             ticket={selectedTicket}
             currentUser={currentUser}
