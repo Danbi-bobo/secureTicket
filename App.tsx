@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo } from 'react';
 import { Role, TicketStatus, MessageStatus, User, Ticket, AuditLogEntry, Message, Project } from './types';
 import { USERS, INITIAL_TICKETS, PROJECTS } from './constants';
@@ -189,46 +187,44 @@ const App: React.FC = () => {
   
   const selectedTicket = useMemo(() => tickets.find(t => t.id === selectedTicketId), [tickets, selectedTicketId]);
 
-  const filteredTicketsForUser = useMemo(() => {
+  const ticketsForDashboard = useMemo(() => {
     if (!selectedProjectId) return [];
 
     const projectTickets = tickets.filter(t => t.projectId === selectedProjectId);
 
-    let roleFilteredTickets: Ticket[];
     switch (currentUserRole) {
-      case Role.QUERENT:
-        roleFilteredTickets = projectTickets.filter(t => t.querentId === currentUser.id);
-        break;
-      case Role.RESPONDER:
-        roleFilteredTickets = projectTickets.filter(t => t.responderId === currentUser.id);
-        break;
+      case Role.MEMBER:
+        return projectTickets.filter(t => t.querentId === currentUser.id || t.responderId === currentUser.id);
       case Role.MEDIATOR:
-        roleFilteredTickets = projectTickets;
-        break;
+        return projectTickets;
       default:
-        roleFilteredTickets = [];
+        return [];
     }
-
+  }, [currentUser, currentUserRole, tickets, selectedProjectId]);
+  
+  const filteredTicketsForUser = useMemo(() => {
+    const responderFiltered = responderFilter === 'all'
+      ? ticketsForDashboard
+      : ticketsForDashboard.filter(t => t.responderId === responderFilter);
+    
     const statusFiltered = statusFilter === 'all'
-      ? roleFilteredTickets
-      : roleFilteredTickets.filter(t => t.status === statusFilter);
-
-    if (currentUserRole === Role.MEDIATOR && responderFilter !== 'all') {
-      return statusFiltered.filter(t => t.responderId === responderFilter);
-    }
+      ? responderFiltered
+      : responderFiltered.filter(t => t.status === statusFilter);
     
     return statusFiltered;
-  }, [currentUser, currentUserRole, tickets, selectedProjectId, statusFilter, responderFilter]);
+  }, [ticketsForDashboard, statusFilter, responderFilter]);
+
   
   const adminAllTickets = useMemo(() => {
     let allTickets = tickets;
-    const statusFiltered = statusFilter === 'all'
+    const responderFiltered = responderFilter === 'all'
         ? allTickets
-        : allTickets.filter(t => t.status === statusFilter);
+        : allTickets.filter(t => t.responderId === responderFilter);
+    
+    const statusFiltered = statusFilter === 'all'
+        ? responderFiltered
+        : responderFiltered.filter(t => t.status === statusFilter);
 
-    if (responderFilter !== 'all') {
-        return statusFiltered.filter(t => t.responderId === responderFilter);
-    }
     return statusFiltered;
   }, [tickets, statusFilter, responderFilter]);
 
@@ -238,7 +234,7 @@ const App: React.FC = () => {
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">
           {currentUserRole} Dashboard
         </h2>
-        {currentUserRole === Role.QUERENT && (
+        {currentUserRole === Role.MEMBER && (
           <button
             onClick={() => setIsCreatingTicket(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
@@ -250,6 +246,7 @@ const App: React.FC = () => {
       </div>
       <TicketList 
         tickets={filteredTicketsForUser} 
+        sourceTicketsForCounts={ticketsForDashboard}
         onSelectTicket={setSelectedTicketId} 
         users={users} 
         currentUser={currentUser}
@@ -259,6 +256,9 @@ const App: React.FC = () => {
         responderFilter={responderFilter}
         setResponderFilter={setResponderFilter}
         projectId={selectedProjectId}
+        onUpdateTicket={updateTicket}
+        onUpdateMessage={updateMessage}
+        onAddAuditLog={addAuditLog}
       />
     </>
   );
@@ -279,9 +279,7 @@ const App: React.FC = () => {
           Admin Panel
         </h2>
         <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
-            {/* FIX: The TabButton component requires a 'children' prop which was missing. Added text content as children. */}
             <TabButton tab="manage">Manage Projects &amp; Users</TabButton>
-            {/* FIX: The TabButton component requires a 'children' prop which was missing. Added text content as children. */}
             <TabButton tab="tickets">All Tickets</TabButton>
         </div>
 
@@ -295,6 +293,7 @@ const App: React.FC = () => {
         ) : (
             <TicketList 
                 tickets={adminAllTickets}
+                sourceTicketsForCounts={tickets}
                 onSelectTicket={setSelectedTicketId}
                 users={users}
                 currentUser={currentUser}
@@ -305,6 +304,9 @@ const App: React.FC = () => {
                 setResponderFilter={setResponderFilter}
                 projectId={selectedProjectId}
                 projects={projects}
+                onUpdateTicket={updateTicket}
+                onUpdateMessage={updateMessage}
+                onAddAuditLog={addAuditLog}
             />
         )}
       </div>

@@ -24,17 +24,20 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
   const [editingMessage, setEditingMessage] = useState<{ id: string, content: string } | null>(null);
   const [editingTicket, setEditingTicket] = useState<{ title: string, description: string } | null>(null);
   const [selectedResponder, setSelectedResponder] = useState(ticket.responderId || '');
+  const [isReopening, setIsReopening] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [reopenAssignee, setReopenAssignee] = useState('');
   
   const isTicketLocked = ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.REJECTED;
 
   const handleApproveTicket = () => {
     if (!currentUserRole) return;
     if (!selectedResponder) {
-      alert("Please select a responder.");
+      alert("Please select a member to assign the ticket to.");
       return;
     }
     onUpdateTicket(ticket.id, { status: TicketStatus.ASSIGNED, responderId: selectedResponder });
-    onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'APPROVE & ASSIGN', `Ticket approved and assigned to a Responder.`);
+    onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'APPROVE & ASSIGN', `Ticket approved and assigned to a Member.`);
   };
 
   const handleRejectTicket = () => {
@@ -48,9 +51,9 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
     const status = currentUserRole === Role.MEDIATOR ? MessageStatus.APPROVED : MessageStatus.PENDING_APPROVAL;
     onAddMessage(ticket.id, currentUser.id, newMessage, status);
     
-    if (currentUserRole === Role.QUERENT) {
+    if (currentUser.id === ticket.querentId) {
         onUpdateTicket(ticket.id, { status: TicketStatus.IN_PROGRESS });
-    } else if (currentUserRole === Role.RESPONDER) {
+    } else if (currentUser.id === ticket.responderId) {
         onUpdateTicket(ticket.id, { status: TicketStatus.WAITING_FEEDBACK });
     }
     
@@ -78,28 +81,67 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
   const handleChangeResponder = () => {
      if (!currentUserRole) return;
      if (!selectedResponder || selectedResponder === ticket.responderId) {
-         alert("Please select a new responder.");
+         alert("Please select a new member to assign.");
          return;
      }
      onUpdateTicket(ticket.id, { responderId: selectedResponder });
-     onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CHANGE_RESPONDER', `The assigned Responder has been changed.`);
+     onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CHANGE_ASSIGNEE', `The assigned Member has been changed.`);
   }
 
-  const handleCloseTicket = () => {
+  const handleRequestCloseTicket = () => {
+      if (!currentUserRole || currentUser.id !== ticket.querentId) return;
+      onUpdateTicket(ticket.id, { status: TicketStatus.PENDING_CLOSE_APPROVAL });
+      onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'REQUEST_CLOSE', `Creator requested to close ticket.`);
+  };
+
+  const handleForceCloseTicket = () => {
+    if (currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN) {
+        onUpdateTicket(ticket.id, { status: TicketStatus.CLOSED });
+        onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CLOSE_TICKET', `Mediator/Admin closed the ticket.`);
+    }
+  };
+
+  const handleApproveClosure = () => {
       if (!currentUserRole) return;
-      if (currentUserRole === Role.QUERENT) {
-          onUpdateTicket(ticket.id, { status: TicketStatus.CLOSED });
-          onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'REQUEST_CLOSE', `Querent requested to close ticket.`);
-          onAddAuditLog(currentUser.id, currentUser.id, Role.MEDIATOR, 'APPROVE_CLOSE', `Ticket closure approved.`);
-      } else if (currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN) {
-          onUpdateTicket(ticket.id, { status: TicketStatus.CLOSED });
-          onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CLOSE_TICKET', `Mediator/Admin closed the ticket.`);
-      }
+      onUpdateTicket(ticket.id, { status: TicketStatus.CLOSED });
+      onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'APPROVE_CLOSE', 'Ticket closure approved.');
+  };
+
+  const handleRejectClosure = () => {
+      if (!currentUserRole) return;
+      onUpdateTicket(ticket.id, { status: TicketStatus.IN_PROGRESS });
+      onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'REJECT_CLOSE', 'Ticket closure request rejected.');
+  };
+
+  const handleReopenTicket = () => {
+    if (!reopenReason.trim() || !currentUserRole) {
+        alert("A reason is required to reopen the ticket.");
+        return;
+    }
+
+    if (currentUser.id === ticket.querentId) {
+        onUpdateTicket(ticket.id, { status: TicketStatus.PENDING_APPROVAL });
+        onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'REOPEN', `Ticket reopened by Creator. Reason: ${reopenReason}`);
+    } else if (currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN) {
+        if (!reopenAssignee) {
+            alert("Please select a member to assign the reopened ticket to.");
+            return;
+        }
+        onUpdateTicket(ticket.id, { status: TicketStatus.ASSIGNED, responderId: reopenAssignee });
+        onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'REOPEN', `Ticket reopened by ${currentUserRole}. Reason: ${reopenReason}`);
+    }
+    setIsReopening(false);
+    setReopenReason('');
+    setReopenAssignee('');
   };
   
-  const respondersInProject = users.filter(u => 
-    u.memberships.some(m => m.projectId === ticket.projectId && m.role === Role.RESPONDER)
+  const membersInProject = users.filter(u => 
+    u.memberships.some(m => m.projectId === ticket.projectId && m.role === Role.MEMBER) &&
+    u.id !== ticket.querentId
   );
+  
+  const isCreator = currentUser.id === ticket.querentId;
+  const canReopen = isTicketLocked && (isCreator || currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN);
 
   const renderTicketHeader = () => (
     <div className="p-6 bg-white dark:bg-gray-800 rounded-t-lg border-b dark:border-gray-700">
@@ -115,6 +157,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
             [TicketStatus.ASSIGNED]: 'bg-blue-100 text-blue-800',
             [TicketStatus.IN_PROGRESS]: 'bg-indigo-100 text-indigo-800',
             [TicketStatus.WAITING_FEEDBACK]: 'bg-purple-100 text-purple-800',
+            [TicketStatus.PENDING_CLOSE_APPROVAL]: 'bg-orange-100 text-orange-800',
             [TicketStatus.CLOSED]: 'bg-green-100 text-green-800',
             [TicketStatus.REJECTED]: 'bg-red-100 text-red-800',
           }[ticket.status]}`}>
@@ -132,8 +175,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
         <div className="p-4 bg-yellow-50 dark:bg-gray-700/50 flex flex-col sm:flex-row items-center gap-4">
           <h3 className="text-lg font-semibold flex-shrink-0">Review Ticket</h3>
           <select value={selectedResponder} onChange={e => setSelectedResponder(e.target.value)} className="flex-grow p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500">
-            <option value="">-- Select Responder --</option>
-            {respondersInProject.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            <option value="">-- Select Member to Assign --</option>
+            {membersInProject.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
           <div className="flex gap-2">
             <button onClick={handleApproveTicket} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center gap-2"><CheckIcon className="w-5 h-5"/>Approve & Assign</button>
@@ -142,21 +185,56 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
         </div>
       );
     }
+
+    if (ticket.status === TicketStatus.PENDING_CLOSE_APPROVAL) {
+      return (
+          <div className="p-4 bg-orange-50 dark:bg-gray-700/50 flex flex-col sm:flex-row items-center gap-4 justify-between">
+              <h3 className="text-lg font-semibold">Review Closure Request</h3>
+              <div className="flex gap-2">
+                  <button onClick={handleApproveClosure} className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center gap-2"><CheckIcon className="w-5 h-5"/>Approve Closure</button>
+                  <button onClick={handleRejectClosure} className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center gap-2"><XMarkIcon className="w-5 h-5"/>Reject</button>
+              </div>
+          </div>
+      );
+    }
     
     return (
       <div className="p-4 bg-gray-50 dark:bg-gray-700/50 flex flex-col sm:flex-row items-center gap-4 justify-between">
           <div className="flex items-center gap-4">
-            <h3 className="text-lg font-semibold flex-shrink-0">Change Responder</h3>
+            <h3 className="text-lg font-semibold flex-shrink-0">Change Assignee</h3>
             <select value={selectedResponder} onChange={e => setSelectedResponder(e.target.value)} className="p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500">
-                {respondersInProject.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                {membersInProject.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
             <button onClick={handleChangeResponder} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Change</button>
           </div>
-          <button onClick={handleCloseTicket} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2"><LockClosedIcon className="w-5 h-5"/> Force Close Ticket</button>
+          <button onClick={handleForceCloseTicket} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2"><LockClosedIcon className="w-5 h-5"/> Force Close Ticket</button>
       </div>
     );
   };
   
+  const renderReopenForm = () => (
+    <div className="p-4 border-t dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
+        <h3 className="font-semibold text-lg mb-2">Reopen Ticket</h3>
+        <textarea
+            value={reopenReason}
+            onChange={e => setReopenReason(e.target.value)}
+            placeholder="Please provide a reason for reopening this ticket..."
+            className="w-full px-3 py-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 mb-2"
+            rows={3}
+        />
+        {(currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN) && (
+          <select value={reopenAssignee} onChange={e => setReopenAssignee(e.target.value)} className="w-full p-2 border rounded-md dark:bg-gray-600 dark:border-gray-500 mb-2">
+              <option value="">-- Select Member to Assign --</option>
+              {membersInProject.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        )}
+        <div className="flex justify-end gap-2">
+            <button onClick={() => setIsReopening(false)} className="px-4 py-2 bg-gray-300 dark:bg-gray-500 rounded-md">Cancel</button>
+            <button onClick={handleReopenTicket} className="px-4 py-2 bg-indigo-600 text-white rounded-md">Submit</button>
+        </div>
+    </div>
+  );
+
   return (
     <div className="bg-white dark:bg-gray-800 shadow-xl rounded-lg overflow-hidden">
       <div className="p-4 border-b dark:border-gray-700">
@@ -194,8 +272,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
           />
         </div>
       </div>
+      
+      {isReopening && renderReopenForm()}
 
-      {!isTicketLocked && ticket.status !== TicketStatus.PENDING_APPROVAL && (
+      {!isTicketLocked && !isReopening && ticket.status !== TicketStatus.PENDING_APPROVAL && ticket.status !== TicketStatus.PENDING_CLOSE_APPROVAL && (
         <div className="p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
           <div className="flex items-center gap-4">
             <input
@@ -216,9 +296,19 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
           </div>
         </div>
       )}
-       {isTicketLocked && (
+       
+       {!isTicketLocked && !isReopening && isCreator && ticket.status !== TicketStatus.PENDING_CLOSE_APPROVAL && (
+         <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t dark:border-gray-600 text-center">
+            <button onClick={handleRequestCloseTicket} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">Request to Close Ticket</button>
+         </div>
+       )}
+       
+       {isTicketLocked && !isReopening && (
         <div className="p-4 text-center bg-gray-100 dark:bg-gray-700 border-t dark:border-gray-600">
           <p className="text-gray-600 dark:text-gray-400 font-medium flex items-center justify-center gap-2"><LockClosedIcon className="w-5 h-5"/> This ticket is closed. No further messages can be sent.</p>
+           {canReopen && (
+             <button onClick={() => setIsReopening(true)} className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Reopen Ticket</button>
+           )}
         </div>
       )}
     </div>

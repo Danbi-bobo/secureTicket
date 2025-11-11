@@ -13,7 +13,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ projects, users, onAddP
   const [newProjectName, setNewProjectName] = useState('');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [userToAdd, setUserToAdd] = useState('');
-  const [roleToAssign, setRoleToAssign] = useState<Role>(Role.QUERENT);
+  const [roleToAssign, setRoleToAssign] = useState<Role>(Role.MEMBER);
 
   const handleProjectCreate = () => {
     if (newProjectName.trim()) {

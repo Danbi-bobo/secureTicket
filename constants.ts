@@ -18,19 +18,19 @@ export const USERS: User[] = [
     id: 'user_querent_1',
     name: 'Alice',
     memberships: [
-      { projectId: 'proj_hr', role: Role.QUERENT },
-      { projectId: 'proj_it', role: Role.QUERENT },
+      { projectId: 'proj_hr', role: Role.MEMBER },
+      { projectId: 'proj_it', role: Role.MEMBER },
     ],
   },
   {
     id: 'user_responder_1',
     name: 'Bob',
-    memberships: [{ projectId: 'proj_it', role: Role.RESPONDER }],
+    memberships: [{ projectId: 'proj_it', role: Role.MEMBER }],
   },
   {
     id: 'user_responder_2',
     name: 'Charlie',
-    memberships: [{ projectId: 'proj_hr', role: Role.RESPONDER }],
+    memberships: [{ projectId: 'proj_hr', role: Role.MEMBER }],
   },
   {
     id: 'user_mediator_1',
@@ -57,7 +57,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
     messages: [],
     auditLog: [
-      { id: 'log_1_1', userId: 'user_querent_1', role: Role.QUERENT, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+      { id: 'log_1_1', userId: 'user_querent_1', role: Role.MEMBER, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000) },
     ],
   },
   {
@@ -77,7 +77,7 @@ export const INITIAL_TICKETS: Ticket[] = [
       { id: 'msg_2_3', senderId: 'user_querent_1', content: 'Thank you. I have submitted the form. How long does the review process usually take?', status: MessageStatus.PENDING_APPROVAL, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000) },
     ],
     auditLog: [
-      { id: 'log_2_1', userId: 'user_querent_1', role: Role.QUERENT, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      { id: 'log_2_1', userId: 'user_querent_1', role: Role.MEMBER, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       { id: 'log_2_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to a Responder.', timestamp: new Date(Date.now() - 23.5 * 60 * 60 * 1000) },
     ],
   },
@@ -97,9 +97,9 @@ export const INITIAL_TICKETS: Ticket[] = [
        { id: 'msg_3_2', senderId: 'user_responder_2', content: 'Yes, the policy applies to all departments, but exceptions can be made with direct manager approval.', status: MessageStatus.APPROVED, timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) },
     ],
     auditLog: [
-      { id: 'log_3_1', userId: 'user_querent_1', role: Role.QUERENT, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
+      { id: 'log_3_1', userId: 'user_querent_1', role: Role.MEMBER, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
       { id: 'log_3_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to a Responder.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 10000) },
-      { id: 'log_3_3', userId: 'user_querent_1', role: Role.QUERENT, action: 'CLOSE', details: 'Ticket closed by querent, approved by mediator.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+      { id: 'log_3_3', userId: 'user_querent_1', role: Role.MEMBER, action: 'CLOSE', details: 'Ticket closed by querent, approved by mediator.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
     ],
   },
 ];

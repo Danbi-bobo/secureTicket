@@ -29,8 +29,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUser, cur
     }
 
     if (isCurrentUserSender) return 'You';
-    if (senderRoleInProject === Role.QUERENT) return 'Querent';
-    if (senderRoleInProject === Role.RESPONDER) return 'Responder';
+    
+    if (sender.id === ticket.querentId) return 'Creator';
+    if (sender.id === ticket.responderId) return 'Assignee';
+    if (senderRoleInProject === Role.MEDIATOR) return 'Mediator';
+
     return 'System';
   };
   

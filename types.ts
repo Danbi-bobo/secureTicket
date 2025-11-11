@@ -1,7 +1,6 @@
 
 export enum Role {
-  QUERENT = 'Querent',
-  RESPONDER = 'Responder',
+  MEMBER = 'Member',
   MEDIATOR = 'Mediator',
   ADMIN = 'Admin',
 }
@@ -11,6 +10,7 @@ export enum TicketStatus {
   ASSIGNED = 'Assigned',
   IN_PROGRESS = 'In Progress',
   WAITING_FEEDBACK = 'Waiting for Feedback',
+  PENDING_CLOSE_APPROVAL = 'Pending Close Approval',
   CLOSED = 'Closed',
   REJECTED = 'Rejected',
 }
