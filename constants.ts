@@ -1,4 +1,3 @@
-
 import { Role, TicketStatus, MessageStatus, User, Ticket, Project } from './types';
 
 export const PROJECTS: Project[] = [
@@ -79,7 +78,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     ],
     auditLog: [
       { id: 'log_2_1', userId: 'user_querent_1', role: Role.QUERENT, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-      { id: 'log_2_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to Bob.', timestamp: new Date(Date.now() - 23.5 * 60 * 60 * 1000) },
+      { id: 'log_2_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to a Responder.', timestamp: new Date(Date.now() - 23.5 * 60 * 60 * 1000) },
     ],
   },
   {
@@ -99,7 +98,7 @@ export const INITIAL_TICKETS: Ticket[] = [
     ],
     auditLog: [
       { id: 'log_3_1', userId: 'user_querent_1', role: Role.QUERENT, action: 'CREATE', details: 'Ticket created.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
-      { id: 'log_3_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to Charlie.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 10000) },
+      { id: 'log_3_2', userId: 'user_mediator_1', role: Role.MEDIATOR, action: 'ASSIGN', details: 'Ticket assigned to a Responder.', timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 10000) },
       { id: 'log_3_3', userId: 'user_querent_1', role: Role.QUERENT, action: 'CLOSE', details: 'Ticket closed by querent, approved by mediator.', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
     ],
   },

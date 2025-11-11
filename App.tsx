@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { Role, TicketStatus, MessageStatus, User, Ticket, AuditLogEntry, Message, Project } from './types';
 import { USERS, INITIAL_TICKETS, PROJECTS } from './constants';
@@ -6,6 +7,67 @@ import TicketDetail from './components/TicketDetail';
 import TicketList from './components/TicketList';
 import AdminDashboard from './components/AdminDashboard';
 import { CreateIcon, UserIcon, BriefcaseIcon } from './components/icons';
+
+interface CreateTicketFormProps {
+  onCancel: () => void;
+  onSubmit: (title: string, description: string) => void;
+}
+
+const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ onCancel, onSubmit }) => {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+
+  const handleSubmit = () => {
+    if (title.trim() && description.trim()) {
+      onSubmit(title, description);
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg animate-fade-in">
+        <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Create a New Ticket</h2>
+        <div className="space-y-6">
+            <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                <input
+                    type="text"
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    placeholder="A brief summary of your inquiry"
+                />
+            </div>
+            <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea
+                    id="description"
+                    rows={6}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Provide as much detail as possible..."
+                ></textarea>
+            </div>
+            <div className="flex justify-end gap-4">
+                <button
+                    onClick={onCancel}
+                    className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleSubmit}
+                    disabled={!title || !description}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+                >
+                    Submit Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>(USERS);
@@ -21,6 +83,7 @@ const App: React.FC = () => {
   const [isCreatingTicket, setIsCreatingTicket] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all');
   const [responderFilter, setResponderFilter] = useState<string | 'all'>('all');
+  const [adminTab, setAdminTab] = useState<'manage' | 'tickets'>('manage');
 
   const currentUserRole = useMemo(() => {
     if (!selectedProjectId) return undefined;
@@ -126,7 +189,7 @@ const App: React.FC = () => {
   
   const selectedTicket = useMemo(() => tickets.find(t => t.id === selectedTicketId), [tickets, selectedTicketId]);
 
-  const filteredTickets = useMemo(() => {
+  const filteredTicketsForUser = useMemo(() => {
     if (!selectedProjectId) return [];
 
     const projectTickets = tickets.filter(t => t.projectId === selectedProjectId);
@@ -140,7 +203,6 @@ const App: React.FC = () => {
         roleFilteredTickets = projectTickets.filter(t => t.responderId === currentUser.id);
         break;
       case Role.MEDIATOR:
-      case Role.ADMIN:
         roleFilteredTickets = projectTickets;
         break;
       default:
@@ -151,12 +213,24 @@ const App: React.FC = () => {
       ? roleFilteredTickets
       : roleFilteredTickets.filter(t => t.status === statusFilter);
 
-    if ((currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN) && responderFilter !== 'all') {
+    if (currentUserRole === Role.MEDIATOR && responderFilter !== 'all') {
       return statusFiltered.filter(t => t.responderId === responderFilter);
     }
     
     return statusFiltered;
   }, [currentUser, currentUserRole, tickets, selectedProjectId, statusFilter, responderFilter]);
+  
+  const adminAllTickets = useMemo(() => {
+    let allTickets = tickets;
+    const statusFiltered = statusFilter === 'all'
+        ? allTickets
+        : allTickets.filter(t => t.status === statusFilter);
+
+    if (responderFilter !== 'all') {
+        return statusFiltered.filter(t => t.responderId === responderFilter);
+    }
+    return statusFiltered;
+  }, [tickets, statusFilter, responderFilter]);
 
   const renderDashboard = () => (
     <>
@@ -175,7 +249,7 @@ const App: React.FC = () => {
         )}
       </div>
       <TicketList 
-        tickets={filteredTickets} 
+        tickets={filteredTicketsForUser} 
         onSelectTicket={setSelectedTicketId} 
         users={users} 
         currentUser={currentUser}
@@ -189,70 +263,53 @@ const App: React.FC = () => {
     </>
   );
 
-  const renderAdminDashboard = () => (
-    <div>
-      <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">
-        Admin Panel
-      </h2>
-      <AdminDashboard 
-        projects={projects}
-        users={users}
-        onAddProject={handleAddProject}
-        onUpdateUserMemberships={handleUpdateUserMemberships}
-      />
-    </div>
-  );
-
-  const renderCreateTicketForm = () => {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
+  const renderAdminView = () => {
+    const TabButton = ({ tab, children }: {tab: 'manage' | 'tickets', children: React.ReactNode}) => (
+        <button
+            onClick={() => setAdminTab(tab)}
+            className={`px-4 py-2 text-sm font-medium rounded-md ${adminTab === tab ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+        >
+            {children}
+        </button>
+    );
 
     return (
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg animate-fade-in">
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Create a New Ticket</h2>
-            <div className="space-y-6">
-                <div>
-                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-                    <input
-                        type="text"
-                        id="title"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                        placeholder="A brief summary of your inquiry"
-                    />
-                </div>
-                <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                    <textarea
-                        id="description"
-                        rows={6}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Provide as much detail as possible..."
-                    ></textarea>
-                </div>
-                <div className="flex justify-end gap-4">
-                    <button
-                        onClick={() => setIsCreatingTicket(false)}
-                        className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={() => handleCreateTicket(title, description)}
-                        disabled={!title || !description}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Submit Ticket
-                    </button>
-                </div>
-            </div>
+      <div>
+        <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
+          Admin Panel
+        </h2>
+        <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+            {/* FIX: The TabButton component requires a 'children' prop which was missing. Added text content as children. */}
+            <TabButton tab="manage">Manage Projects &amp; Users</TabButton>
+            {/* FIX: The TabButton component requires a 'children' prop which was missing. Added text content as children. */}
+            <TabButton tab="tickets">All Tickets</TabButton>
         </div>
-    );
-  };
 
+        {adminTab === 'manage' ? (
+             <AdminDashboard 
+                projects={projects}
+                users={users}
+                onAddProject={handleAddProject}
+                onUpdateUserMemberships={handleUpdateUserMemberships}
+            />
+        ) : (
+            <TicketList 
+                tickets={adminAllTickets}
+                onSelectTicket={setSelectedTicketId}
+                users={users}
+                currentUser={currentUser}
+                currentUserRole={currentUserRole}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                responderFilter={responderFilter}
+                setResponderFilter={setResponderFilter}
+                projectId={selectedProjectId}
+                projects={projects}
+            />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-gray-900 dark:text-gray-200 font-sans">
@@ -323,8 +380,12 @@ const App: React.FC = () => {
             users={users}
             findUser={findUser}
           />
-        ) : isCreatingTicket ? renderCreateTicketForm() 
-          : currentUserRole === Role.ADMIN ? renderAdminDashboard() 
+        ) : isCreatingTicket ? (
+          <CreateTicketForm
+            onCancel={() => setIsCreatingTicket(false)}
+            onSubmit={handleCreateTicket}
+          />
+        ) : currentUserRole === Role.ADMIN ? renderAdminView() 
           : renderDashboard()}
       </main>
     </div>

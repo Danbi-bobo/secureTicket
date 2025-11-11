@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Ticket, User, Role, TicketStatus, MessageStatus, Message, AuditLogEntry } from '../types';
 import { ArrowUturnLeftIcon, SendIcon, CheckIcon, XMarkIcon, PencilIcon, UserIcon, LockClosedIcon } from './icons';
@@ -34,9 +33,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
       alert("Please select a responder.");
       return;
     }
-    const responderName = findUser(selectedResponder)?.name || 'Unknown';
     onUpdateTicket(ticket.id, { status: TicketStatus.ASSIGNED, responderId: selectedResponder });
-    onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'APPROVE & ASSIGN', `Ticket approved and assigned to ${responderName}.`);
+    onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'APPROVE & ASSIGN', `Ticket approved and assigned to a Responder.`);
   };
 
   const handleRejectTicket = () => {
@@ -83,10 +81,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
          alert("Please select a new responder.");
          return;
      }
-     const oldResponderName = findUser(ticket.responderId || '')?.name || 'N/A';
-     const newResponderName = findUser(selectedResponder)?.name || 'N/A';
      onUpdateTicket(ticket.id, { responderId: selectedResponder });
-     onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CHANGE_RESPONDER', `Responder changed from ${oldResponderName} to ${newResponderName}.`);
+     onAddAuditLog(ticket.id, currentUser.id, currentUserRole, 'CHANGE_RESPONDER', `The assigned Responder has been changed.`);
   }
 
   const handleCloseTicket = () => {
@@ -191,7 +187,11 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
           )}
         </div>
         <div className="lg:w-1/3 border-l dark:border-gray-700">
-          <AuditLog auditLog={ticket.auditLog} findUser={findUser} />
+          <AuditLog 
+            auditLog={ticket.auditLog} 
+            findUser={findUser} 
+            currentUserRole={currentUserRole}
+          />
         </div>
       </div>
 

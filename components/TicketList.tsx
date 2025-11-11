@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Ticket, TicketStatus, User, Role } from '../types';
+import { Ticket, TicketStatus, User, Role, Project } from '../types';
 import { ClockIcon } from './icons';
 
 interface TicketListProps {
@@ -14,6 +14,7 @@ interface TicketListProps {
   responderFilter: string | 'all';
   setResponderFilter: (responderId: string | 'all') => void;
   projectId: string | null;
+  projects?: Project[];
 }
 
 const TicketStatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
@@ -43,6 +44,7 @@ const TicketList: React.FC<TicketListProps> = ({
     responderFilter,
     setResponderFilter,
     projectId,
+    projects,
  }) => {
   
   const getUserName = (id?: string) => users.find(u => u.id === id)?.name || 'N/A';
@@ -53,10 +55,21 @@ const TicketList: React.FC<TicketListProps> = ({
   };
 
   const isMediatorOrAdmin = currentUserRole === Role.MEDIATOR || currentUserRole === Role.ADMIN;
-
-  const respondersInProject = users.filter(u => 
-    u.memberships.some(m => m.projectId === projectId && m.role === Role.RESPONDER)
-  );
+  
+  const respondersForFilter = React.useMemo(() => {
+    // If projects prop is passed, it's the admin global view. Show all responders.
+    if (projects) {
+        const allResponders = users.filter(u => 
+            u.memberships.some(m => m.role === Role.RESPONDER)
+        );
+        // Deduplicate in case a user is a responder in multiple projects
+        return Array.from(new Map(allResponders.map(item => [item.id, item])).values());
+    }
+    // Existing logic for Mediator or project-scoped view
+    return users.filter(u =>
+        u.memberships.some(m => m.projectId === projectId && m.role === Role.RESPONDER)
+    );
+  }, [users, projectId, projects]);
 
   const renderFilters = () => (
     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-4">
@@ -85,7 +98,7 @@ const TicketList: React.FC<TicketListProps> = ({
             className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2"
           >
             <option value="all">All Responders</option>
-            {respondersInProject.map(responder => (
+            {respondersForFilter.map(responder => (
               <option key={responder.id} value={responder.id}>{responder.name}</option>
             ))}
           </select>
@@ -109,11 +122,13 @@ const TicketList: React.FC<TicketListProps> = ({
       {tickets.length === 0 ? (
         <div className="text-center py-16">
           <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300">No tickets found.</h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">There are currently no tickets in this project matching your criteria.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-2">There are currently no tickets matching your criteria.</p>
         </div>
       ) : (
         <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700">
-          {tickets.map(ticket => (
+          {tickets.map(ticket => {
+             const project = projects?.find(p => p.id === ticket.projectId);
+             return (
             <li
               key={ticket.id}
               onClick={() => onSelectTicket(ticket.id)}
@@ -121,9 +136,12 @@ const TicketList: React.FC<TicketListProps> = ({
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-                    Ticket #{ticket.id}
-                  </p>
+                   <div className="flex items-center gap-4">
+                     <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                        Ticket #{ticket.id}
+                     </p>
+                     {project && <p className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200">{project.name}</p>}
+                   </div>
                   <p className="text-lg font-bold text-gray-900 dark:text-white truncate mt-1">
                     {ticket.title}
                   </p>
@@ -146,7 +164,7 @@ const TicketList: React.FC<TicketListProps> = ({
                 )}
               </div>
             </li>
-          ))}
+          )})}
         </ul>
       )}
     </div>
