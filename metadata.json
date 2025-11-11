@@ -1,0 +1,5 @@
+{
+  "name": "Secure Anonymous Ticketing System",
+  "description": "A secure, anonymous ticketing system with a three-role architecture (Querent, Mediator, Responder) to ensure privacy and controlled communication. Features include ticket creation, mediator approval, anonymous chat, message moderation, dynamic responder assignment, detailed status tracking, and a comprehensive audit log.",
+  "requestFramePermissions": []
+}
