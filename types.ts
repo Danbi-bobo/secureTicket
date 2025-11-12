@@ -30,6 +30,7 @@ export interface Project {
 export interface User {
   id: string;
   name: string;
+  isAdmin?: boolean;
   memberships: {
     projectId: string;
     role: Role;
@@ -55,7 +56,7 @@ export interface AuditLogEntry {
 }
 
 export interface Ticket {
-  id: number;
+  id: string;
   projectId: string;
   title: string;
   description: string;
@@ -67,6 +68,7 @@ export interface Ticket {
   mediatorId: string;
   createdAt: Date;
   updatedAt: Date;
+  closedAt?: Date;
   messages: Message[];
   auditLog: AuditLogEntry[];
 }

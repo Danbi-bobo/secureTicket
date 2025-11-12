@@ -5,7 +5,7 @@ import { ClockIcon, CheckIcon, XMarkIcon } from './icons';
 interface TicketListProps {
   tickets: Ticket[];
   sourceTicketsForCounts: Ticket[];
-  onSelectTicket: (id: number) => void;
+  onSelectTicket: (id: string) => void;
   users: User[];
   currentUser: User;
   currentUserRole?: Role;
@@ -15,9 +15,9 @@ interface TicketListProps {
   setResponderFilter: (responderId: string | 'all') => void;
   projectId: string | null;
   projects?: Project[];
-  onUpdateTicket: (ticketId: number, updates: Partial<Ticket>) => void;
-  onUpdateMessage: (ticketId: number, messageId: string, updates: Partial<Message>) => void;
-  onAddAuditLog: (ticketId: number, userId: string, role: Role, action: string, details: string) => void;
+  onUpdateTicket: (ticketId: string, updates: Partial<Ticket>) => void;
+  onUpdateMessage: (ticketId: string, messageId: string, updates: Partial<Message>) => void;
+  onAddAuditLog: (ticketId: string, userId: string, role: Role, action: string, details: string) => void;
 }
 
 const TicketStatusBadge: React.FC<{ status: TicketStatus }> = ({ status }) => {
@@ -55,7 +55,7 @@ const TicketList: React.FC<TicketListProps> = ({
     onAddAuditLog,
  }) => {
   
-  const [assigneeSelections, setAssigneeSelections] = useState<{ [key: number]: string }>({});
+  const [assigneeSelections, setAssigneeSelections] = useState<{ [key: string]: string }>({});
   
   const getUserName = (id?: string) => users.find(u => u.id === id)?.name || 'N/A';
   

@@ -5,6 +5,8 @@ import TicketDetail from './components/TicketDetail';
 import TicketList from './components/TicketList';
 import AdminDashboard from './components/AdminDashboard';
 import { CreateIcon, UserIcon, BriefcaseIcon } from './components/icons';
+import LoginScreen from './components/LoginScreen';
+import { supabase } from './supabaseClient';
 
 interface CreateTicketFormProps {
   onCancel: () => void;
@@ -72,13 +74,14 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [session, setSession] = useState<import('@supabase/supabase-js').Session | null>(null);
   
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
   );
 
-  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isCreatingTicket, setIsCreatingTicket] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all');
   const [responderFilter, setResponderFilter] = useState<string | 'all'>('all');
@@ -88,6 +91,10 @@ const App: React.FC = () => {
     if (!currentUser || !selectedProjectId) return undefined;
     return currentUser.memberships.find(m => m.projectId === selectedProjectId)?.role;
   }, [currentUser, selectedProjectId]);
+
+  const isGlobalAdmin = useMemo(() => {
+    return currentUser?.isAdmin ?? false;
+  }, [currentUser]);
   
   const availableProjectsForCurrentUser = useMemo(() => {
     if (!currentUser) return [];
@@ -96,17 +103,48 @@ const App: React.FC = () => {
 
   const findUser = (id: string) => users.find(u => u.id === id);
 
+  // Subscribe to auth state
   useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    };
+    init();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Load data only when session exists
+  useEffect(() => {
+    if (!session) {
+      setIsLoading(false);
+      return;
+    }
+
     const load = async () => {
       setIsLoading(true);
       try {
+        const user = session.user;
+        if (user) {
+          await supabase.from('users').upsert({
+            id: user.id,
+            name: (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || (user.email ? user.email.split('@')[0] : 'User'),
+            email: user.email,
+            avatar_url: user.user_metadata?.avatar_url ?? null
+          }, { onConflict: 'id' });
+        }
         const [p, u, t] = await Promise.all([fetchProjects(), fetchUsers(), fetchTickets()]);
         setProjects(p);
         setUsers(u);
         setTickets(t);
         if (u.length > 0) {
-          setCurrentUser(u[0]);
-          const firstProjectId = u[0].memberships.length > 0 ? u[0].memberships[0].projectId : null;
+          const me = user ? u.find(x => x.id === user.id) || u[0] : u[0];
+          setCurrentUser(me);
+          const firstProjectId = me.memberships.length > 0 ? me.memberships[0].projectId : null;
           setSelectedProjectId(firstProjectId);
         }
       } catch (e) {
@@ -116,13 +154,13 @@ const App: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [session]);
 
   const handleCreateTicket = (title: string, description: string) => {
     if (!currentUser || !selectedProjectId || !currentUserRole) return;
 
     const newTicket: Ticket = {
-      id: Math.floor(Math.random() * 10000),
+      id: `tic_${crypto.randomUUID?.() || Date.now().toString()}`,
       projectId: selectedProjectId,
       title,
       description,
@@ -146,7 +184,7 @@ const App: React.FC = () => {
     setIsCreatingTicket(false);
   };
   
-  const addAuditLog = (ticketId: number, userId: string, role: Role, action: string, details: string) => {
+  const addAuditLog = (ticketId: string, userId: string, role: Role, action: string, details: string) => {
     const newLog: AuditLogEntry = {
       id: `log_${Date.now()}`,
       userId,
@@ -160,11 +198,11 @@ const App: React.FC = () => {
     ));
   };
   
-  const updateTicket = (ticketId: number, updates: Partial<Ticket>) => {
+  const updateTicket = (ticketId: string, updates: Partial<Ticket>) => {
         setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, ...updates, updatedAt: new Date() } : t));
   };
   
-  const addMessage = (ticketId: number, senderId: string, content: string, status: MessageStatus) => {
+  const addMessage = (ticketId: string, senderId: string, content: string, status: MessageStatus) => {
         const newMessage: Message = {
             id: `msg_${Date.now()}`,
             senderId,
@@ -176,7 +214,7 @@ const App: React.FC = () => {
         setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, messages: [...t.messages, newMessage], updatedAt: new Date() } : t));
   };
 
-  const updateMessage = (ticketId: number, messageId: string, updates: Partial<Message>) => {
+  const updateMessage = (ticketId: string, messageId: string, updates: Partial<Message>) => {
     setTickets(prev => prev.map(t => {
       if (t.id === ticketId) {
         const updatedMessages = t.messages.map(m => m.id === messageId ? { ...m, ...updates } : m);
@@ -204,8 +242,23 @@ const App: React.FC = () => {
     const newUsers = users.map(u => u.id === userId ? { ...u, memberships } : u);
     setUsers(newUsers);
     
-    if (currentUser.id === userId) {
+    if (currentUser && currentUser.id === userId) {
         setCurrentUser(newUsers.find(u => u.id === userId)!);
+    }
+  };
+
+  const handleUpdateUserAdmin = async (userId: string, isAdmin: boolean) => {
+    try {
+      const { error } = await supabase.from('users').update({ is_admin: isAdmin }).eq('id', userId);
+      if (error) throw error;
+      const newUsers = users.map(u => u.id === userId ? { ...u, isAdmin } : u);
+      setUsers(newUsers);
+      if (currentUser && currentUser.id === userId) {
+        setCurrentUser(newUsers.find(u => u.id === userId)!);
+      }
+    } catch (e) {
+      console.error('Failed to update admin status:', e);
+      alert('Failed to update admin status');
     }
   };
   
@@ -252,13 +305,15 @@ const App: React.FC = () => {
     return statusFiltered;
   }, [tickets, statusFilter, responderFilter]);
 
+  const effectiveRole = isGlobalAdmin ? Role.ADMIN : currentUserRole;
+
   const renderDashboard = () => (
     <>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">
-          {currentUserRole} Dashboard
+          {effectiveRole} Dashboard
         </h2>
-        {currentUserRole === Role.MEMBER && (
+        {effectiveRole === Role.MEMBER && (
           <button
             onClick={() => setIsCreatingTicket(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-300"
@@ -274,7 +329,7 @@ const App: React.FC = () => {
         onSelectTicket={setSelectedTicketId} 
         users={users} 
         currentUser={currentUser}
-        currentUserRole={currentUserRole}
+        currentUserRole={effectiveRole}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         responderFilter={responderFilter}
@@ -311,8 +366,10 @@ const App: React.FC = () => {
              <AdminDashboard 
                 projects={projects}
                 users={users}
+                tickets={tickets}
                 onAddProject={handleAddProject}
                 onUpdateUserMemberships={handleUpdateUserMemberships}
+                onUpdateUserAdmin={handleUpdateUserAdmin}
             />
         ) : (
             <TicketList 
@@ -321,7 +378,7 @@ const App: React.FC = () => {
                 onSelectTicket={setSelectedTicketId}
                 users={users}
                 currentUser={currentUser}
-                currentUserRole={currentUserRole}
+                currentUserRole={Role.ADMIN}
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
                 responderFilter={responderFilter}
@@ -339,6 +396,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen text-gray-900 dark:text-gray-200 font-sans">
+      {!session ? (
+        <LoginScreen />
+      ) : (
+      <>
       <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-10">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -364,28 +425,15 @@ const App: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <UserIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                  <span className="font-medium">{currentUser.name}</span>
-                  {currentUserRole && <span className="text-sm text-gray-500 dark:text-gray-400">({currentUserRole})</span>}
+                  <span className="font-medium">{currentUser ? currentUser.name : '—'}</span>
+                  {effectiveRole && <span className="text-sm text-gray-500 dark:text-gray-400">({effectiveRole})</span>}
                 </div>
-                <select
-                  value={currentUser.id}
-                  onChange={e => {
-                      const newUserId = e.target.value;
-                      const newUser = users.find(u => u.id === newUserId)!;
-                      setCurrentUser(newUser);
-                      const firstProjectId = newUser.memberships.length > 0 ? newUser.memberships[0].projectId : null;
-                      setSelectedProjectId(firstProjectId);
-                      setSelectedTicketId(null);
-                      setIsCreatingTicket(false);
-                      setStatusFilter('all');
-                      setResponderFilter('all');
-                  }}
-                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                <button
+                  onClick={async () => { await supabase.auth.signOut(); }}
+                  className="px-3 py-1.5 text-sm bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
                 >
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>{user.name}</option>
-                  ))}
-                </select>
+                  Logout
+                </button>
               </div>
             </div>
           </div>
@@ -397,11 +445,13 @@ const App: React.FC = () => {
           <div className="text-sm text-gray-500">Loading...</div>
         ) : !currentUser ? (
           <div className="text-sm text-gray-500">No users found.</div>
+        ) : isGlobalAdmin ? (
+          renderAdminView()
         ) : selectedTicket ? (
           <TicketDetail
             ticket={selectedTicket}
             currentUser={currentUser}
-            currentUserRole={currentUserRole}
+            currentUserRole={effectiveRole}
             onBack={() => setSelectedTicketId(null)}
             onUpdateTicket={updateTicket}
             onAddMessage={addMessage}
@@ -415,9 +465,11 @@ const App: React.FC = () => {
             onCancel={() => setIsCreatingTicket(false)}
             onSubmit={handleCreateTicket}
           />
-        ) : currentUserRole === Role.ADMIN ? renderAdminView() 
+        ) : effectiveRole === Role.ADMIN ? renderAdminView() 
           : renderDashboard()}
       </main>
+      </>
+      )}
     </div>
   );
 };

@@ -9,10 +9,10 @@ interface TicketDetailProps {
   currentUser: User;
   currentUserRole?: Role;
   onBack: () => void;
-  onUpdateTicket: (ticketId: number, updates: Partial<Ticket>) => void;
-  onAddMessage: (ticketId: number, senderId: string, content: string, status: MessageStatus) => void;
-  onUpdateMessage: (ticketId: number, messageId: string, updates: Partial<Message>) => void;
-  onAddAuditLog: (ticketId: number, userId: string, role: Role, action: string, details: string) => void;
+  onUpdateTicket: (ticketId: string, updates: Partial<Ticket>) => void;
+  onAddMessage: (ticketId: string, senderId: string, content: string, status: MessageStatus) => void;
+  onUpdateMessage: (ticketId: string, messageId: string, updates: Partial<Message>) => void;
+  onAddAuditLog: (ticketId: string, userId: string, role: Role, action: string, details: string) => void;
   users: User[];
   findUser: (id: string) => User | undefined;
 }
