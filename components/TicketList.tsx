@@ -189,6 +189,25 @@ const TicketList: React.FC<TicketListProps> = ({
                 const actionText = action === 'approve' ? 'approved' : 'rejected';
                 onUpdateMessage(ticket.id, messageId, { status: action === 'approve' ? MessageStatus.APPROVED : MessageStatus.REJECTED });
                 onAddAuditLog(ticket.id, currentUser.id, currentUserRole, `${action.toUpperCase()}_MESSAGE`, `Message ${actionText}.`);
+                
+                // Cập nhật ticket status khi message được approve
+                if (action === 'approve') {
+                    const message = ticket.messages.find(m => m.id === messageId);
+                    if (message) {
+                        let newTicketStatus: TicketStatus | undefined;
+                        if (message.senderId === ticket.querentId) {
+                            // Message từ querent được approve -> chuyển sang IN_PROGRESS
+                            newTicketStatus = TicketStatus.IN_PROGRESS;
+                        } else if (ticket.responderId && message.senderId === ticket.responderId) {
+                            // Message từ responder được approve -> chuyển sang WAITING_FEEDBACK
+                            newTicketStatus = TicketStatus.WAITING_FEEDBACK;
+                        }
+                        
+                        if (newTicketStatus) {
+                            onUpdateTicket(ticket.id, { status: newTicketStatus });
+                        }
+                    }
+                }
             };
 
             const handleApproveClosure = () => {

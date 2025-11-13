@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
+// Trong Vite, tất cả biến môi trường client-side phải có prefix VITE_
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 

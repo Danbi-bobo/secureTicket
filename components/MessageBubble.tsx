@@ -65,39 +65,51 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUser, cur
 
   return (
     <div className={`flex items-start gap-3 ${isCurrentUserSender ? 'flex-row-reverse' : ''}`}>
-      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
-        <UserIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${
+        isCurrentUserSender 
+          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white' 
+          : 'bg-gradient-to-r from-blue-400 to-cyan-500 text-white'
+      }`}>
+        <UserIcon className="w-5 h-5" />
       </div>
       <div className={`w-full max-w-lg ${isCurrentUserSender ? 'items-end' : 'items-start'} flex flex-col`}>
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-sm">{getDisplayName()}</span>
-          <span className="text-xs text-gray-400">{new Date(message.timestamp).toLocaleTimeString()}</span>
+        <div className={`flex items-center gap-2 mb-1 ${isCurrentUserSender ? 'flex-row-reverse' : ''}`}>
+          <span className="font-semibold text-sm text-gray-700">{getDisplayName()}</span>
+          <span className="text-xs text-gray-500">{new Date(message.timestamp).toLocaleTimeString()}</span>
         </div>
-        <div className={`mt-1 p-3 rounded-lg w-fit ${isCurrentUserSender ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}>
+        <div className={`mt-1 p-4 rounded-2xl w-fit shadow-sm ${
+          isCurrentUserSender 
+            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white' 
+            : 'bg-white border-2 border-gray-200 text-gray-800'
+        }`}>
           {isEditing && currentUserRole === Role.MEDIATOR ? (
             <div>
               <textarea 
                 value={editedContent} 
                 onChange={(e) => setEditedContent(e.target.value)}
-                className="w-full p-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-md border border-gray-300 dark:border-gray-500"
+                className="w-full p-3 text-sm bg-white text-gray-900 rounded-xl border-2 border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
               />
-              <div className="flex gap-2 mt-2">
-                <button onClick={handleEditSave} className="px-2 py-1 text-xs bg-green-500 text-white rounded">Save</button>
-                <button onClick={() => setIsEditing(false)} className="px-2 py-1 text-xs bg-gray-500 text-white rounded">Cancel</button>
+              <div className="flex gap-2 mt-3">
+                <button onClick={handleEditSave} className="px-4 py-2 text-xs bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:shadow-md font-semibold transition-all">Save</button>
+                <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-xs bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition-all">Cancel</button>
               </div>
             </div>
           ) : (
-             <p className="text-sm">{message.content}</p>
+             <p className={`text-sm ${isCurrentUserSender ? 'text-white' : 'text-gray-800'}`}>{message.content}</p>
           )}
 
           {message.status === MessageStatus.PENDING_APPROVAL && (
-            <div className="text-xs mt-2 opacity-80 flex items-center gap-1 italic">
+            <div className={`text-xs mt-2 flex items-center gap-1 italic ${
+              isCurrentUserSender ? 'text-white/90' : 'text-gray-600'
+            }`}>
                 <ClockIcon className="w-3 h-3"/>
                 Waiting for mediator approval...
             </div>
           )}
           {message.status === MessageStatus.EDITED && (
-             <div className="text-xs mt-2 opacity-80 italic">
+             <div className={`text-xs mt-2 italic ${
+              isCurrentUserSender ? 'text-white/90' : 'text-gray-600'
+            }`}>
                 (Edited by Mediator)
             </div>
           )}
